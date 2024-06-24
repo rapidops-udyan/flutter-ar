@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-
-import 'package:flutter/services.dart';
 import 'package:flutter_ar/flutter_ar.dart';
+import 'package:flutter_ar/flutter_ar_node.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,35 +15,9 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
-  final _flutterArPlugin = FlutterAr();
-
   @override
   void initState() {
     super.initState();
-    initPlatformState();
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      platformVersion =
-          await _flutterArPlugin.getPlatformVersion() ?? 'Unknown platform version';
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
-    });
   }
 
   @override
@@ -52,12 +25,49 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          centerTitle: true,
+          title: const Text('Flutter AR'),
         ),
-        body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+        body: FutureBuilder(
+          future: _checkPermission(),
+          builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+            if (snapshot.data == true) {
+              return Stack(
+                children: [
+                  FlutterAr(
+                    onViewCreated: (controller) {
+                      debugPrint('flutter: onViewCreated');
+                      controller.addNode(FlutterARNode(
+                        fileLocation: 'assets/curtain.glb',
+                        position: KotlinFloat3(z: -1.0),
+                        rotation: KotlinFloat3(x: 15),
+                      ));
+                    },
+                  ),
+                ],
+              );
+            } else if (snapshot.data == false) {
+              return const Center(
+                child: Text('Permission not Granted'),
+              );
+            } else {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+          },
         ),
       ),
     );
+  }
+
+  Future<bool> _checkPermission() async {
+    bool hasPermission = false;
+    const cameraPermission = Permission.camera;
+    if (await cameraPermission.isDenied) {
+      await cameraPermission.request();
+      hasPermission = true;
+    }
+    return hasPermission;
   }
 }

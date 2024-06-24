@@ -46,7 +46,7 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        minSdk = 24
     }
 
     dependencies {
@@ -65,4 +65,9 @@ android {
             }
         }
     }
+}
+
+dependencies {
+    implementation 'io.github.sceneview:arsceneview:2.2.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 }
