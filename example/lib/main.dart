@@ -62,7 +62,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<bool> _checkPermission() async {
-    bool hasPermission = false;
+    bool hasPermission = true;
     const cameraPermission = Permission.camera;
     if (await cameraPermission.isDenied) {
       await cameraPermission.request();
