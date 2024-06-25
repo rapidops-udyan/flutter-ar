@@ -6,7 +6,6 @@ import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import androidx.lifecycle.Lifecycle
-import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Plane
 import com.google.ar.core.TrackingFailureReason
@@ -31,7 +30,7 @@ class FlutterArWrapper(
     messenger: BinaryMessenger,
     id: Int,
 ) : PlatformView, MethodCallHandler {
-    private val TAG = "SceneViewWrapper"
+    private val TAG = "FlutterArWrapper"
     private var sceneView: ARSceneView
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val channel = MethodChannel(messenger, "scene_view_$id")
@@ -54,20 +53,12 @@ class FlutterArWrapper(
             planeRenderer.isEnabled = true
             configureSession { session, config ->
                 config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+                config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                 config.depthMode = when (session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                     true -> Config.DepthMode.AUTOMATIC
                     else -> Config.DepthMode.DISABLED
                 }
                 config.instantPlacementMode = Config.InstantPlacementMode.DISABLED
-            }
-            onSessionUpdated = { _, frame ->
-                if (anchorNode == null) {
-                    frame.getUpdatedPlanes()
-                        .firstOrNull { it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
-                        ?.let { plane ->
-                            addAnchorNode(plane.createAnchor(plane.centerPose))
-                        }
-                }
             }
             onTrackingFailureChanged = { reason ->
                 if (currentTrackingFailureReason != reason) {
@@ -75,7 +66,6 @@ class FlutterArWrapper(
                     channel.invokeMethod("onTrackingFailureChanged", reason?.name)
                 }
             }
-
         }
         sceneView.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -85,22 +75,31 @@ class FlutterArWrapper(
         channel.setMethodCallHandler(this)
     }
 
-    private fun addAnchorNode(anchor: Anchor) {
-        sceneView.addChildNode(
-            AnchorNode(sceneView.engine, anchor).apply {
-                isEditable = true
-                mainScope.launch {
-                    buildModelNode()?.let { addChildNode(it) }
-                }
-                anchorNode = this
+    private fun addAnchorNode(path: String) {
+        sceneView.onSessionUpdated = { _, frame ->
+            if (anchorNode == null) {
+                frame.getUpdatedPlanes()
+                    .firstOrNull { it.type == Plane.Type.VERTICAL || it.type == Plane.Type.HORIZONTAL_DOWNWARD_FACING || it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
+                    ?.let { plane ->
+                        sceneView.addChildNode(
+                            AnchorNode(sceneView.engine,plane.createAnchor(plane.centerPose)).apply {
+                                isEditable = true
+                                mainScope.launch {
+                                    Log.i(TAG, "Building Model Node...")
+                                    buildModelNode(path)?.let { addChildNode(it) }
+                                }
+                                anchorNode = this
+                            }
+                        )
+                    }
             }
-        )
+        }
+
     }
 
-    private suspend fun buildModelNode(): ModelNode? {
-        sceneView.modelLoader.loadModelInstance(
-            "https://sceneview.github.io/assets/models/DamagedHelmet.glb"
-        )?.let { modelInstance ->
+    private suspend fun buildModelNode(path: String): ModelNode? {
+        Log.i(TAG, "Loading Model Node...")
+        sceneView.modelLoader.loadModelInstance(path)?.let { modelInstance ->
             return ModelNode(
                 modelInstance = modelInstance,
                 scaleToUnits = 0.5f,
@@ -112,16 +111,50 @@ class FlutterArWrapper(
         return null
     }
 
+    private fun getFileLocation(fileLocation: String): String {
+        return if (fileLocation.startsWith("http://") || fileLocation.startsWith("https://")) {
+            fileLocation // It's already a URL, return as is
+        } else {
+            Utils.getFlutterAssetKey(
+                activity,
+                fileLocation
+            ) // It's a Flutter asset, get the correct path
+        }
+    }
+
+    private fun loadModel(flutterNode: FlutterSceneViewNode) {
+        sceneView.session?.let { session ->
+            if (session.isResumed) {
+                when (flutterNode) {
+                    is FlutterReferenceNode -> {
+                        addAnchorNode(getFileLocation(flutterNode.fileLocation))
+                    }
+
+                    else -> {
+                        Log.i(TAG, "Frame is Null")
+                    }
+                }
+            } else {
+                Log.i(TAG, "AR session is not ready")
+            }
+        }
+    }
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "init" -> {
                 result.success(null)
             }
+
             "addNode" -> {
                 Log.i(TAG, "addNode")
-                // This method is no longer needed as we're automatically placing the model
+                var flutterNode = FlutterSceneViewNode.from(call.arguments as Map<String, *>)
+                mainScope.launch {
+                    loadModel(flutterNode)
+                }
                 result.success(null)
             }
+
             else -> result.notImplemented()
         }
     }

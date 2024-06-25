@@ -23,15 +23,15 @@ abstract class FlutterArPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<void> init(int sceneId) {
-    throw UnimplementedError('init() has not been implemented.');
+  Future<void> init(int sceneId) async {
+    await instance.init(sceneId);
   }
 
   void addNode(FlutterARNode node) {
-    throw UnimplementedError('addNode() has not been implemented.');
+    instance.addNode(node);
   }
 
   void dispose(int sceneId) {
-    throw UnimplementedError('dispose() has not been implemented.');
+    instance.dispose(sceneId);
   }
 }
