@@ -31,6 +31,18 @@ abstract class FlutterArPlatform extends PlatformInterface {
     instance.addNode(node);
   }
 
+  Future<void> zoom(int sceneId, double scale) async {
+    await instance.zoom(sceneId, scale);
+  }
+
+  Future<void> rotate(int sceneId, List<double> rotation) async {
+    await instance.rotate(sceneId, rotation);
+  }
+
+  Future<void> move(int sceneId, List<double> position) async {
+    await instance.move(sceneId, position);
+  }
+
   void dispose(int sceneId) {
     instance.dispose(sceneId);
   }

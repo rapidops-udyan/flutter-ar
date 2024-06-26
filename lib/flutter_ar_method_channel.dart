@@ -39,6 +39,24 @@ class MethodChannelFlutterAr extends FlutterArPlatform {
     _channel?.invokeMethod('addNode', node.toMap());
   }
 
+  @override
+  Future<void> zoom(int sceneId, double scale) async {
+    final channel = ensureChannelInitialized(sceneId);
+    await channel.invokeMethod('zoom', {'scale': scale});
+  }
+
+  @override
+  Future<void> rotate(int sceneId, List<double> rotation) async {
+    final channel = ensureChannelInitialized(sceneId);
+    await channel.invokeMethod('rotate', {'rotation': rotation});
+  }
+
+  @override
+  Future<void> move(int sceneId, List<double> position) async {
+    final channel = ensureChannelInitialized(sceneId);
+    await channel.invokeMethod('move', {'position': position});
+  }
+
   Future<dynamic> _handleMethodCall(MethodCall call, int mapId) async {
     switch (call.method) {
       default:

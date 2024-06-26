@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_ar/flutter_ar.dart';
 import 'package:flutter_ar/flutter_ar_node.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -19,6 +20,13 @@ class _ArViewState extends State<ArView> {
   void initState() {
     super.initState();
     _checkPermission();
+    enterFullScreen();
+  }
+
+  @override
+  void dispose() {
+    exitFullScreen();
+    super.dispose();
   }
 
   Future<void> _checkPermission() async {
@@ -34,22 +42,34 @@ class _ArViewState extends State<ArView> {
     });
   }
 
+  void _toggleArView() {
+    setState(() {
+      _showArView = !_showArView;
+    });
+  }
+
+  void enterFullScreen() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+  }
+
+  void exitFullScreen() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: SystemUiOverlay.values);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: _isLoading
+    return Scaffold(
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Stack(
               children: [
                 if (_showArView && _hasPermission)
                   FlutterAr(
                     onViewCreated: (controller) {
-                      controller.addNode(FlutterARNode(
-                        fileLocation: 'assets/curtain.glb',
-                        position: KotlinFloat3(z: -1.0),
-                        rotation: KotlinFloat3(x: 15),
-                      ));
+                      controller.addNode(
+                        FlutterARNode(fileLocation: 'assets/curtain.glb'),
+                      );
                     },
                   )
                 else if (!_hasPermission)
@@ -62,13 +82,7 @@ class _ArViewState extends State<ArView> {
                   right: 0,
                   child: Center(
                     child: ElevatedButton(
-                      onPressed: _hasPermission
-                          ? () {
-                              setState(() {
-                                _showArView = !_showArView;
-                              });
-                            }
-                          : null,
+                      onPressed: _hasPermission ? _toggleArView : null,
                       child:
                           Text(_showArView ? 'Close AR View' : 'Open AR View'),
                     ),

@@ -18,6 +18,7 @@ import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.arcore.getUpdatedPlanes
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.math.Position
+import io.github.sceneview.math.Scale
 import io.github.sceneview.node.ModelNode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,20 +32,12 @@ class FlutterArWrapper(
     id: Int,
 ) : PlatformView, MethodCallHandler {
     private val TAG = "FlutterArWrapper"
-    private var sceneView: ARSceneView
+    private val sceneView: ARSceneView
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val channel = MethodChannel(messenger, "scene_view_$id")
 
     private var anchorNode: AnchorNode? = null
     private var currentTrackingFailureReason: TrackingFailureReason? = null
-
-    override fun getView(): View {
-        return sceneView
-    }
-
-    override fun dispose() {
-        Log.i(TAG, "dispose")
-    }
 
     init {
         Log.i(TAG, "init")
@@ -75,6 +68,14 @@ class FlutterArWrapper(
         channel.setMethodCallHandler(this)
     }
 
+    override fun getView(): View {
+        return sceneView
+    }
+
+    override fun dispose() {
+        Log.i(TAG, "dispose")
+    }
+
     private fun addAnchorNode(path: String) {
         sceneView.onSessionUpdated = { _, frame ->
             if (anchorNode == null) {
@@ -82,7 +83,10 @@ class FlutterArWrapper(
                     .firstOrNull { it.type == Plane.Type.VERTICAL || it.type == Plane.Type.HORIZONTAL_DOWNWARD_FACING || it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
                     ?.let { plane ->
                         sceneView.addChildNode(
-                            AnchorNode(sceneView.engine,plane.createAnchor(plane.centerPose)).apply {
+                            AnchorNode(
+                                sceneView.engine,
+                                plane.createAnchor(plane.centerPose)
+                            ).apply {
                                 isEditable = true
                                 mainScope.launch {
                                     Log.i(TAG, "Building Model Node...")
@@ -94,7 +98,6 @@ class FlutterArWrapper(
                     }
             }
         }
-
     }
 
     private suspend fun buildModelNode(path: String): ModelNode? {
@@ -102,10 +105,10 @@ class FlutterArWrapper(
         sceneView.modelLoader.loadModelInstance(path)?.let { modelInstance ->
             return ModelNode(
                 modelInstance = modelInstance,
-                scaleToUnits = 0.5f,
-                centerOrigin = Position(y = -0.5f)
+                scaleToUnits = 0.2f,
             ).apply {
                 isEditable = true
+                editableScaleRange = 0.8f..1.0f
             }
         }
         return null
@@ -152,6 +155,24 @@ class FlutterArWrapper(
                 mainScope.launch {
                     loadModel(flutterNode)
                 }
+                result.success(null)
+            }
+
+            "zoom" -> {
+                val scale = call.argument<Double>("scale")
+                anchorNode?.animateScales((scale?.toFloat() ?: 1.0f) as Scale)
+                result.success(null)
+            }
+
+            "rotate" -> {
+                val (x, y, z) = call.argument<List<Double>>("rotation") ?: listOf(0.0, 0.0, 0.0)
+                anchorNode?.transform(Position(x.toFloat(), y.toFloat(), z.toFloat()))
+                result.success(null)
+            }
+
+            "move" -> {
+                val (x, y, z) = call.argument<List<Double>>("position") ?: listOf(0.0, 0.0, 0.0)
+                anchorNode?.position = Position(x.toFloat(), y.toFloat(), z.toFloat())
                 result.success(null)
             }
 
