@@ -19,6 +19,18 @@ class FlutterARController {
     FlutterArPlatform.instance.addNode(node);
   }
 
+  Future<void> zoom(int sceneId, double scale) async {
+    await FlutterArPlatform.instance.zoom(sceneId, scale);
+  }
+
+  Future<void> rotate(int sceneId, List<double> rotation) async {
+    await FlutterArPlatform.instance.rotate(sceneId, rotation);
+  }
+
+  Future<void> move(int sceneId, List<double> position) async {
+    await FlutterArPlatform.instance.move(sceneId, position);
+  }
+
   void dispose() {
     FlutterArPlatform.instance.dispose(sceneId);
   }

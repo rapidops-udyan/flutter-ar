@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ar/flutter_ar.dart';
+import 'package:flutter_ar/flutter_ar_controller.dart';
 import 'package:flutter_ar/flutter_ar_node.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -14,18 +15,20 @@ class ArView extends StatefulWidget {
 class _ArViewState extends State<ArView> {
   bool _showArView = false;
   bool _hasPermission = false;
-  bool _isLoading = true;
+  FlutterARController? _flutterARController;
+  double _scale = 1.0;
+  double _rotation = 0.0;
 
   @override
   void initState() {
     super.initState();
     _checkPermission();
-    enterFullScreen();
+    _enterFullScreen();
   }
 
   @override
   void dispose() {
-    exitFullScreen();
+    _exitFullScreen();
     super.dispose();
   }
 
@@ -33,13 +36,14 @@ class _ArViewState extends State<ArView> {
     const cameraPermission = Permission.camera;
     if (await cameraPermission.isDenied) {
       final status = await cameraPermission.request();
-      _hasPermission = status.isGranted;
+      setState(() {
+        _hasPermission = status.isGranted;
+      });
     } else {
-      _hasPermission = true;
+      setState(() {
+        _hasPermission = true;
+      });
     }
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   void _toggleArView() {
@@ -48,33 +52,68 @@ class _ArViewState extends State<ArView> {
     });
   }
 
-  void enterFullScreen() {
+  void _enterFullScreen() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
   }
 
-  void exitFullScreen() {
+  void _exitFullScreen() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
         overlays: SystemUiOverlay.values);
+  }
+
+  void _zoomIn() {
+    setState(() {
+      if (_scale < 1.0) {
+        _scale += 0.1;
+      }
+    });
+    _flutterARController!.zoom(_flutterARController!.sceneId, _scale);
+  }
+
+  void _zoomOut() {
+    setState(() {
+      if (_scale >= 0.2) {
+        _scale -= 0.1;
+      }
+    });
+    _flutterARController!.zoom(_flutterARController!.sceneId, _scale);
+  }
+
+  void _rotateLeft() {
+    setState(() {
+      _rotation -= 10;
+    });
+    _flutterARController!
+        .rotate(_flutterARController!.sceneId, [_rotation, 0, 0]);
+  }
+
+  void _rotateRight() {
+    setState(() {
+      _rotation += 10;
+    });
+    _flutterARController!
+        .rotate(_flutterARController!.sceneId, [_rotation, 0, 0]);
+  }
+
+  void _addNode() {
+    if (_flutterARController != null) {
+      _flutterARController!.addNode(
+        FlutterARNode(fileLocation: 'assets/curtain.glb'),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
+      body: _hasPermission
+          ? Stack(
               children: [
-                if (_showArView && _hasPermission)
+                if (_showArView)
                   FlutterAr(
                     onViewCreated: (controller) {
-                      controller.addNode(
-                        FlutterARNode(fileLocation: 'assets/curtain.glb'),
-                      );
+                      _flutterARController ??= controller;
                     },
-                  )
-                else if (!_hasPermission)
-                  const Center(
-                    child: Text('Camera permission not granted'),
                   ),
                 Positioned(
                   bottom: 20,
@@ -82,14 +121,64 @@ class _ArViewState extends State<ArView> {
                   right: 0,
                   child: Center(
                     child: ElevatedButton(
-                      onPressed: _hasPermission ? _toggleArView : null,
+                      onPressed: _toggleArView,
                       child:
                           Text(_showArView ? 'Close AR View' : 'Open AR View'),
                     ),
                   ),
                 ),
+                if (_showArView) _buildControls(),
               ],
+            )
+          : const Center(
+              child: Text('Camera permission not granted'),
             ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Positioned(
+      bottom: 20,
+      right: 0,
+      child: Column(
+        children: [
+          IconButton(
+            onPressed: _addNode,
+            icon: const Icon(
+              Icons.place_rounded,
+              color: Colors.white,
+            ),
+          ),
+          IconButton(
+            onPressed: _zoomIn,
+            icon: const Icon(
+              Icons.add_circle_outline_rounded,
+              color: Colors.white,
+            ),
+          ),
+          IconButton(
+            onPressed: _zoomOut,
+            icon: const Icon(
+              Icons.remove_circle_outline_rounded,
+              color: Colors.white,
+            ),
+          ),
+          IconButton(
+            onPressed: _rotateLeft,
+            icon: const Icon(
+              Icons.rotate_left_rounded,
+              color: Colors.white,
+            ),
+          ),
+          IconButton(
+            onPressed: _rotateRight,
+            icon: const Icon(
+              Icons.rotate_right_rounded,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

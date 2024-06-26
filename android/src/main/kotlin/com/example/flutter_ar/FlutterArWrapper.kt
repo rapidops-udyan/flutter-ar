@@ -7,7 +7,7 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.lifecycle.Lifecycle
 import com.google.ar.core.Config
-import com.google.ar.core.Plane
+import com.google.ar.core.Pose
 import com.google.ar.core.TrackingFailureReason
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -15,7 +15,6 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.platform.PlatformView
 import io.github.sceneview.ar.ARSceneView
-import io.github.sceneview.ar.arcore.getUpdatedPlanes
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Scale
@@ -76,39 +75,37 @@ class FlutterArWrapper(
         Log.i(TAG, "dispose")
     }
 
+
     private fun addAnchorNode(path: String) {
-        sceneView.onSessionUpdated = { _, frame ->
-            if (anchorNode == null) {
-                frame.getUpdatedPlanes()
-                    .firstOrNull { it.type == Plane.Type.VERTICAL || it.type == Plane.Type.HORIZONTAL_DOWNWARD_FACING || it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
-                    ?.let { plane ->
-                        sceneView.addChildNode(
-                            AnchorNode(
-                                sceneView.engine,
-                                plane.createAnchor(plane.centerPose)
-                            ).apply {
-                                isEditable = true
-                                mainScope.launch {
-                                    Log.i(TAG, "Building Model Node...")
-                                    buildModelNode(path)?.let { addChildNode(it) }
-                                }
-                                anchorNode = this
-                            }
-                        )
+        anchorNode?.let { sceneView.removeChildNode(it) }
+        anchorNode = null
+        sceneView.session?.let { session ->
+            session.createAnchor(session.frame?.androidSensorPose ?: Pose.IDENTITY).let { anchor ->
+                sceneView.addChildNode(
+                    AnchorNode(sceneView.engine, anchor).apply {
+                        isEditable = true
+                        mainScope.launch {
+                            Log.i(TAG, "Building Model Node...")
+                            buildModelNode(path)?.let { addChildNode(it) }
+                        }
+                        anchorNode = this
                     }
+                )
             }
         }
     }
 
     private suspend fun buildModelNode(path: String): ModelNode? {
-        Log.i(TAG, "Loading Model Node...")
         sceneView.modelLoader.loadModelInstance(path)?.let { modelInstance ->
             return ModelNode(
                 modelInstance = modelInstance,
-                scaleToUnits = 0.2f,
+                centerOrigin = Position(z = -0.5f)
             ).apply {
                 isEditable = true
-                editableScaleRange = 0.8f..1.0f
+                isTouchable = false
+                isSmoothTransformEnabled = true
+                isVisible = true
+                smoothTransformSpeed = 0.1f
             }
         }
         return null
@@ -127,18 +124,11 @@ class FlutterArWrapper(
 
     private fun loadModel(flutterNode: FlutterSceneViewNode) {
         sceneView.session?.let { session ->
-            if (session.isResumed) {
-                when (flutterNode) {
-                    is FlutterReferenceNode -> {
-                        addAnchorNode(getFileLocation(flutterNode.fileLocation))
-                    }
-
-                    else -> {
-                        Log.i(TAG, "Frame is Null")
-                    }
+            when (flutterNode) {
+                is FlutterReferenceNode -> {
+                    addAnchorNode(getFileLocation(flutterNode.fileLocation))
                 }
-            } else {
-                Log.i(TAG, "AR session is not ready")
+
             }
         }
     }
@@ -160,7 +150,7 @@ class FlutterArWrapper(
 
             "zoom" -> {
                 val scale = call.argument<Double>("scale")
-                anchorNode?.animateScales((scale?.toFloat() ?: 1.0f) as Scale)
+                anchorNode?.scale = Scale(scale?.toFloat() ?: 1.0f)
                 result.success(null)
             }
 
