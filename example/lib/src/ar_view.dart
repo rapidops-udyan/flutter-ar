@@ -17,7 +17,11 @@ class _ArViewState extends State<ArView> {
   bool _hasPermission = false;
   FlutterARController? _flutterARController;
   double _scale = 1.0;
-  double _rotation = 0.0;
+  double _rotationY = 0.0;
+  double _positionX = 0.0;
+  double _positionY = 0.0;
+  double _positionZ = 0.0;
+  String _currentColor = '#FFFFFF'; // White
 
   @override
   void initState() {
@@ -61,38 +65,34 @@ class _ArViewState extends State<ArView> {
         overlays: SystemUiOverlay.values);
   }
 
-  void _zoomIn() {
+  void _scaleModel(double scale) {
     setState(() {
-      if (_scale < 1.0) {
-        _scale += 0.1;
-      }
+      _scale = scale;
     });
-    _flutterARController!.zoom(_flutterARController!.sceneId, _scale);
+    _flutterARController?.scaleModel(_scale);
   }
 
-  void _zoomOut() {
+  void _moveModel(double x, double y, double z) {
     setState(() {
-      if (_scale >= 0.2) {
-        _scale -= 0.1;
-      }
+      _positionX = x;
+      _positionY = y;
+      _positionZ = z;
     });
-    _flutterARController!.zoom(_flutterARController!.sceneId, _scale);
+    _flutterARController?.moveModel(_positionX, _positionY, _positionZ);
   }
 
-  void _rotateLeft() {
+  void _rotateModel(double angle) {
     setState(() {
-      _rotation -= 10;
+      _rotationY = angle;
     });
-    _flutterARController!
-        .rotate(_flutterARController!.sceneId, [_rotation, 0, 0]);
+    _flutterARController?.rotateModelAroundAxis(_rotationY);
   }
 
-  void _rotateRight() {
+  void _changeModelColor(String color) {
     setState(() {
-      _rotation += 10;
+      _currentColor = color;
     });
-    _flutterARController!
-        .rotate(_flutterARController!.sceneId, [_rotation, 0, 0]);
+    _flutterARController?.changeModelColor(_currentColor);
   }
 
   void _addNode() {
@@ -109,6 +109,14 @@ class _ArViewState extends State<ArView> {
       body: _hasPermission
           ? Stack(
               children: [
+                const Center(
+                    child: Text(
+                  'Flutter AR',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )),
                 if (_showArView)
                   FlutterAr(
                     onViewCreated: (controller) {
@@ -122,8 +130,7 @@ class _ArViewState extends State<ArView> {
                   child: Center(
                     child: ElevatedButton(
                       onPressed: _toggleArView,
-                      child:
-                          Text(_showArView ? 'Close AR View' : 'Open AR View'),
+                      child: Text(_showArView ? 'Close' : 'Start'),
                     ),
                   ),
                 ),
@@ -139,43 +146,101 @@ class _ArViewState extends State<ArView> {
   Widget _buildControls() {
     return Positioned(
       bottom: 20,
-      right: 0,
-      child: Column(
+      right: 10,
+      left: 10,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
-            onPressed: _addNode,
-            icon: const Icon(
-              Icons.place_rounded,
-              color: Colors.white,
-            ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: () =>
+                    _moveModel(_positionX, _positionY + 0.1, _positionZ),
+                icon: const Icon(
+                  Icons.keyboard_arrow_up_rounded,
+                  color: Colors.black,
+                ),
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    style: IconButton.styleFrom(backgroundColor: Colors.white),
+                    onPressed: () =>
+                        _moveModel(_positionX - 0.1, _positionY, _positionZ),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_left_rounded,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(width: 32),
+                  IconButton(
+                    style: IconButton.styleFrom(backgroundColor: Colors.white),
+                    onPressed: () =>
+                        _moveModel(_positionX + 0.1, _positionY, _positionZ),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_right_rounded,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+                onPressed: () =>
+                    _moveModel(_positionX, _positionY - 0.1, _positionZ),
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Colors.black,
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: _zoomIn,
-            icon: const Icon(
-              Icons.add_circle_outline_rounded,
-              color: Colors.white,
-            ),
-          ),
-          IconButton(
-            onPressed: _zoomOut,
-            icon: const Icon(
-              Icons.remove_circle_outline_rounded,
-              color: Colors.white,
-            ),
-          ),
-          IconButton(
-            onPressed: _rotateLeft,
-            icon: const Icon(
-              Icons.rotate_left_rounded,
-              color: Colors.white,
-            ),
-          ),
-          IconButton(
-            onPressed: _rotateRight,
-            icon: const Icon(
-              Icons.rotate_right_rounded,
-              color: Colors.white,
-            ),
+          Column(
+            children: [
+              IconButton(
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+                onPressed: _addNode,
+                icon: const Icon(
+                  Icons.add_location_alt_rounded,
+                  color: Colors.black,
+                ),
+              ),
+              IconButton(
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+                onPressed: () => _scaleModel(_scale + 0.1),
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  color: Colors.black,
+                ),
+              ),
+              IconButton(
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+                onPressed: () => _scaleModel(_scale - 0.1),
+                icon: const Icon(
+                  Icons.remove_circle_outline_rounded,
+                  color: Colors.black,
+                ),
+              ),
+              IconButton(
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+                onPressed: () => _rotateModel(_rotationY + 5),
+                icon: const Icon(
+                  Icons.rotate_right_rounded,
+                  color: Colors.black,
+                ),
+              ),
+              IconButton(
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+                onPressed: () => _rotateModel(_rotationY - 5),
+                icon: const Icon(
+                  Icons.rotate_left_rounded,
+                  color: Colors.black,
+                ),
+              ),
+            ],
           ),
         ],
       ),
